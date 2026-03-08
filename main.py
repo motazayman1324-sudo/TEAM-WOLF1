@@ -45,4 +45,5 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     }
 });
 
-client.login('YOUR_BOT_TOKEN');
+ bot.run(TOKEN)
+
