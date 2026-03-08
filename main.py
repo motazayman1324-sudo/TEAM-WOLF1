@@ -1,49 +1,58 @@
-const { Client, GatewayIntentBits } = require('discord.js');
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildVoiceStates
-    ]
-});
+import discord
+from discord.ext import commands
+from datetime import datetime, timezone
+import os
 
-// نخزن وقت دخول كل عضو
-const voiceJoinTimes = new Map();
+intents = discord.Intents.default()
+intents.voice_states = True
+intents.members = True
 
-client.once('ready', () => {
-    console.log(`Bot logged in as ${client.user.tag}`);
-});
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-client.on('voiceStateUpdate', (oldState, newState) => {
-    const member = newState.member;
+voice_join_times = {}
 
-    // دخول إلى روم صوتي
-    if (!oldState.channelId && newState.channelId) {
-        const joinTime = Date.now();
-        voiceJoinTimes.set(member.id, joinTime);
+@bot.event
+async def on_ready():
+    print(f"✅ Logged in as {bot.user}")
 
-        const joinDate = new Date(joinTime);
-        const hours = joinDate.getHours().toString().padStart(2, '0');
-        const minutes = joinDate.getMinutes().toString().padStart(2, '0');
+@bot.event
+async def on_voice_state_update(member, before, after):
 
-        console.log(`${member.user.tag} joined voice at ${hours}:${minutes}`);
-        member.send(`🎙️ Welcome ${member.user.username}! You joined voice at ${hours}:${minutes}`);
-    }
+    # دخول روم صوتي
+    if before.channel is None and after.channel is not None:
 
-    // خروج من روم صوتي
-    if (oldState.channelId && !newState.channelId) {
-        const joinTime = voiceJoinTimes.get(member.id);
-        if (joinTime) {
-            const durationMs = Date.now() - joinTime;
-            const durationMinutes = Math.floor(durationMs / 60000);
-            const durationSeconds = Math.floor((durationMs % 60000) / 1000);
+        join_time = datetime.now(timezone.utc)
+        voice_join_times[member.id] = join_time
 
-            console.log(`${member.user.tag} left after ${durationMinutes}m ${durationSeconds}s`);
-            member.send(`👋 ${member.user.username}, you stayed in voice for ${durationMinutes}m ${durationSeconds}s`);
+        try:
+            await member.send(
+                f"🎙️ Welcome {member.name}! "
+                f"You joined {after.channel.name} at {join_time.strftime('%H:%M')}"
+            )
+        except:
+            print(f"Couldn't DM {member.name}")
 
-            voiceJoinTimes.delete(member.id);
-        }
-    }
-});
+    # خروج من روم صوتي
+    if before.channel is not None and after.channel is None:
 
- bot.run(TOKEN)
+        if member.id in voice_join_times:
 
+            join_time = voice_join_times[member.id]
+            duration = datetime.now(timezone.utc) - join_time
+
+            minutes, seconds = divmod(int(duration.total_seconds()), 60)
+
+            try:
+                await member.send(
+                    f"👋 {member.name}, you stayed in voice for {minutes}m {seconds}s"
+                )
+            except:
+                print(f"Couldn't DM {member.name}")
+
+            del voice_join_times[member.id]
+
+
+# قراءة التوكن من الاستضافة
+TOKEN = os.getenv("TOKEN")
+
+bot.run(TOKEN)
