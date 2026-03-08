@@ -6,17 +6,17 @@ const client = new Client({
     ]
 });
 
-// تخزين وقت دخول كل عضو
+// نخزن وقت دخول كل عضو
 const voiceJoinTimes = new Map();
 
 client.once('ready', () => {
-    console.log(`✅ تم تسجيل الدخول كبوت: ${client.user.tag}`);
+    console.log(`Bot logged in as ${client.user.tag}`);
 });
 
 client.on('voiceStateUpdate', (oldState, newState) => {
     const member = newState.member;
 
-    // حالة الدخول إلى روم صوتي
+    // دخول إلى روم صوتي
     if (!oldState.channelId && newState.channelId) {
         const joinTime = Date.now();
         voiceJoinTimes.set(member.id, joinTime);
@@ -25,11 +25,11 @@ client.on('voiceStateUpdate', (oldState, newState) => {
         const hours = joinDate.getHours().toString().padStart(2, '0');
         const minutes = joinDate.getMinutes().toString().padStart(2, '0');
 
-        console.log(`${member.user.tag} دخل الروم الصوتي الساعة ${hours}:${minutes}`);
-        member.send(`🎙️ أهلاً ${member.user.username}! دخلت الروم الصوتي الساعة ${hours}:${minutes}`);
+        console.log(`${member.user.tag} joined voice at ${hours}:${minutes}`);
+        member.send(`🎙️ Welcome ${member.user.username}! You joined voice at ${hours}:${minutes}`);
     }
 
-    // حالة الخروج من روم صوتي
+    // خروج من روم صوتي
     if (oldState.channelId && !newState.channelId) {
         const joinTime = voiceJoinTimes.get(member.id);
         if (joinTime) {
@@ -37,12 +37,12 @@ client.on('voiceStateUpdate', (oldState, newState) => {
             const durationMinutes = Math.floor(durationMs / 60000);
             const durationSeconds = Math.floor((durationMs % 60000) / 1000);
 
-            console.log(`${member.user.tag} خرج بعد ${durationMinutes} دقيقة و ${durationSeconds} ثانية`);
-            member.send(`👋 ${member.user.username}، جلست في الروم الصوتي لمدة ${durationMinutes} دقيقة و ${durationSeconds} ثانية`);
+            console.log(`${member.user.tag} left after ${durationMinutes}m ${durationSeconds}s`);
+            member.send(`👋 ${member.user.username}, you stayed in voice for ${durationMinutes}m ${durationSeconds}s`);
 
             voiceJoinTimes.delete(member.id);
         }
     }
 });
 
-bot.run(TOKEN)
+client.login('YOUR_BOT_TOKEN');
