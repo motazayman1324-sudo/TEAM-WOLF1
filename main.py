@@ -1,61 +1,91 @@
 import discord
 from discord.ext import commands
-from datetime import datetime, timezone
+import time
+import json
 import os
 
+TOKEN = "PUT_YOUR_TOKEN_HERE"
+LOGIN_CHANNEL = 1473015218211651706
+
 intents = discord.Intents.default()
+intents.message_content = True
 intents.voice_states = True
-intents.members = True
+intents.guilds = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-voice_join_times = {}
+sessions = {}
+points = {}
 
-# ايدي روم التكست
-LOG_CHANNEL_ID = 1473015218211651706
+# تحميل النقاط
+if os.path.exists("points.json"):
+    with open("points.json", "r") as f:
+        points = json.load(f)
 
+def save_points():
+    with open("points.json", "w") as f:
+        json.dump(points, f)
 
 @bot.event
 async def on_ready():
-    print(f"✅ Logged in as {bot.user}")
-
+    print(f"Logged in as {bot.user}")
 
 @bot.event
-async def on_voice_state_update(member, before, after):
+async def on_message(message):
 
-    channel = bot.get_channel(LOG_CHANNEL_ID)
+    if message.author.bot:
+        return
 
-    # دخول فويس
-    if before.channel is None and after.channel is not None:
+    if message.channel.id != LOGIN_CHANNEL:
+        return
 
-        join_time = datetime.now(timezone.utc)
-        voice_join_times[member.id] = join_time
+    member = message.author
+    guild_member = message.guild.get_member(member.id)
 
-        if channel:
-            await channel.send(
-                f"🟢 **{member.name}** دخل روم الصوت **{after.channel.name}** "
-                f"الساعة {join_time.strftime('%H:%M')}"
-            )
+    # تسجيل دخول
+    if message.content == "تسجيل دخول":
 
-    # خروج فويس
-    if before.channel is not None and after.channel is None:
+        if not guild_member.voice or not guild_member.voice.channel:
+            await message.reply("❌ لازم تكون داخل روم صوتي عشان تسجل دخول")
+            return
 
-        if member.id in voice_join_times:
+        if str(member.id) in sessions:
+            await message.reply("⚠️ انت مسجل دخول بالفعل")
+            return
 
-            join_time = voice_join_times[member.id]
-            duration = datetime.now(timezone.utc) - join_time
+        sessions[str(member.id)] = time.time()
 
-            minutes, seconds = divmod(int(duration.total_seconds()), 60)
+        await message.reply("✅ تم تسجيل دخولك وبدأ حساب الوقت")
 
-            if channel:
-                await channel.send(
-                    f"🔴 **{member.name}** خرج من الصوت بعد "
-                    f"{minutes} دقيقة و {seconds} ثانية"
-                )
+    # تسجيل خروج
+    if message.content == "تسجيل خروج":
 
-            del voice_join_times[member.id]
+        if guild_member.voice and guild_member.voice.channel:
+            await message.reply("❌ لازم تطلع من الروم الصوتي قبل تسجيل الخروج")
+            return
 
+        if str(member.id) not in sessions:
+            await message.reply("⚠️ انت مو مسجل دخول")
+            return
 
-TOKEN = os.getenv("TOKEN")
+        start = sessions[str(member.id)]
+        spent = int(time.time() - start)
+
+        minutes = spent // 60
+
+        del sessions[str(member.id)]
+
+        if str(member.id) not in points:
+            points[str(member.id)] = 0
+
+        points[str(member.id)] += minutes
+
+        save_points()
+
+        await message.reply(
+            f"⏱ مدة حضورك: {minutes} دقيقة\n⭐ نقاطك الحالية: {points[str(member.id)]}"
+        )
+
+    await bot.process_commands(message)
 
 bot.run(TOKEN)
