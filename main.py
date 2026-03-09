@@ -4,7 +4,7 @@ import time
 import json
 import os
 
-TOKEN = "PUT_YOUR_TOKEN_HERE"
+TOKEN = os.getenv("TOKEN")
 LOGIN_CHANNEL = 1473015218211651706
 
 intents = discord.Intents.default()
@@ -17,7 +17,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 sessions = {}
 points = {}
 
-# تحميل النقاط
+# تحميل النقاط إذا موجودة
 if os.path.exists("points.json"):
     with open("points.json", "r") as f:
         points = json.load(f)
@@ -28,7 +28,7 @@ def save_points():
 
 @bot.event
 async def on_ready():
-    print(f"Logged in as {bot.user}")
+    print(f"✅ Bot Online: {bot.user}")
 
 @bot.event
 async def on_message(message):
@@ -39,13 +39,12 @@ async def on_message(message):
     if message.channel.id != LOGIN_CHANNEL:
         return
 
-    member = message.author
-    guild_member = message.guild.get_member(member.id)
+    member = message.guild.get_member(message.author.id)
 
     # تسجيل دخول
     if message.content == "تسجيل دخول":
 
-        if not guild_member.voice or not guild_member.voice.channel:
+        if not member.voice or not member.voice.channel:
             await message.reply("❌ لازم تكون داخل روم صوتي عشان تسجل دخول")
             return
 
@@ -60,7 +59,7 @@ async def on_message(message):
     # تسجيل خروج
     if message.content == "تسجيل خروج":
 
-        if guild_member.voice and guild_member.voice.channel:
+        if member.voice and member.voice.channel:
             await message.reply("❌ لازم تطلع من الروم الصوتي قبل تسجيل الخروج")
             return
 
@@ -69,9 +68,9 @@ async def on_message(message):
             return
 
         start = sessions[str(member.id)]
-        spent = int(time.time() - start)
+        duration = int(time.time() - start)
 
-        minutes = spent // 60
+        minutes = duration // 60
 
         del sessions[str(member.id)]
 
@@ -83,7 +82,7 @@ async def on_message(message):
         save_points()
 
         await message.reply(
-            f"⏱ مدة حضورك: {minutes} دقيقة\n⭐ نقاطك الحالية: {points[str(member.id)]}"
+            f"⏱ مدة حضورك: {minutes} دقيقة\n⭐ نقاطك: {points[str(member.id)]}"
         )
 
     await bot.process_commands(message)
