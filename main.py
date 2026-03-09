@@ -35,21 +35,25 @@ def format_time(seconds):
     s = seconds % 60
 
     parts = []
+
     if h > 0:
-        parts.append(f"{h} ساعة")
+        parts.append(f"⏰ {h} ساعة")
+
     if m > 0:
-        parts.append(f"{m} دقيقة")
+        parts.append(f"🕐 {m} دقيقة")
+
     if s > 0:
-        parts.append(f"{s} ثانية")
+        parts.append(f"⏱️ {s} ثانية")
 
     return " و ".join(parts)
 
 @bot.event
 async def on_ready():
-    print(f"Bot Online: {bot.user}")
+    print(f"🤖 Bot Online: {bot.user}")
 
 @bot.event
 async def on_message(message):
+
     try:
 
         if message.author.bot:
@@ -60,24 +64,26 @@ async def on_message(message):
 
         member = message.guild.get_member(message.author.id)
 
+        # تسجيل دخول
         if message.content == "تسجيل دخول":
 
             if not member.voice or not member.voice.channel:
-                await message.reply("❌ لازم تكون داخل روم صوتي")
+                await message.reply("❌ | لازم تكون داخل روم صوتي للتسجيل.")
                 return
 
             if member.id in sessions:
-                await message.reply("⚠️ انت مسجل دخول بالفعل")
+                await message.reply("⚠️ | انت مسجل دخول بالفعل.")
                 return
 
             sessions[member.id] = time.time()
 
-            await message.reply("✅ تم تسجيل دخولك وبدأ حساب الوقت")
+            await message.reply("🟢 | تم تسجيل دخولك وبدأ حساب وقت الحضور.")
 
+        # تسجيل خروج
         elif message.content == "تسجيل خروج":
 
             if member.id not in sessions:
-                await message.reply("❌ انت مو مسجل دخول")
+                await message.reply("❌ | انت غير مسجل في دفتر الحضور.")
                 return
 
             start = sessions[member.id]
@@ -97,13 +103,18 @@ async def on_message(message):
             time_text = format_time(duration)
 
             await message.reply(
-                f"📋 مدة حضورك: {time_text}\n⭐ النقاط المكتسبة: {earned_points}\n🏆 مجموع نقاطك: {points[str(member.id)]}"
+                f"📋 **دفتر الحضور**\n"
+                f"━━━━━━━━━━━━━━━\n"
+                f"⏳ مدة حضورك:\n{time_text}\n\n"
+                f"⭐ النقاط المكتسبة: **{earned_points}**\n"
+                f"🏆 مجموع نقاطك: **{points[str(member.id)]}**"
             )
 
         await bot.process_commands(message)
 
     except Exception:
         print(traceback.format_exc())
+
 
 @bot.event
 async def on_voice_state_update(member, before, after):
@@ -117,7 +128,12 @@ async def on_voice_state_update(member, before, after):
         if before.channel and not after.channel:
 
             try:
-                await member.send("تم رصد خروجك من الروم الصوتي. لديك 5 دقايق للعودة قبل إلغاء تسجيل الدخول.")
+                await member.send(
+                    "📢 **تنبيه خروج من الروم الصوتي**\n"
+                    "━━━━━━━━━━━━━━━\n"
+                    "🚪 تم رصد خروجك من الروم الصوتي.\n"
+                    "⏳ لديك **5 دقائق** للعودة قبل إلغاء تسجيل الدخول."
+                )
             except:
                 pass
 
@@ -142,7 +158,12 @@ async def on_voice_state_update(member, before, after):
                     save_points()
 
                     try:
-                        await member.send("⏰ انتهت المهلة (5 دقايق)، وتم إلغاء تسجيل دخولك تلقائيًا.")
+                        await member.send(
+                            "⏰ **انتهت المهلة**\n"
+                            "━━━━━━━━━━━━━━━\n"
+                            "❌ انتهت مهلة **5 دقائق**.\n"
+                            "📋 تم إلغاء تسجيل دخولك تلقائياً من دفتر الحضور."
+                        )
                     except:
                         pass
 
@@ -156,11 +177,17 @@ async def on_voice_state_update(member, before, after):
                 del leave_timers[member.id]
 
                 try:
-                    await member.send("✅ تم رصد عودتك للروم الصوتي. تم إلغاء المهلة.")
+                    await member.send(
+                        "✅ **تم رصد عودتك للصوتي**\n"
+                        "━━━━━━━━━━━━━━━\n"
+                        "🎧 مرحباً بعودتك!\n"
+                        "⏳ تم إلغاء المهلة واستمرار تسجيل حضورك."
+                    )
                 except:
                     pass
 
     except Exception:
         print(traceback.format_exc())
+
 
 bot.run(TOKEN)
