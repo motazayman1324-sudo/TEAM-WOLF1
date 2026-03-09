@@ -11,7 +11,6 @@ LOGIN_CHANNEL = 1473015218211651706
 intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
-intents.guilds = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -29,10 +28,11 @@ def save_points():
 
 @bot.event
 async def on_ready():
-    print(f"✅ Bot Online: {bot.user}")
+    print(f"Bot Online: {bot.user}")
 
 @bot.event
 async def on_message(message):
+
     try:
 
         if message.author.bot:
@@ -50,7 +50,6 @@ async def on_message(message):
                 await message.reply("❌ لازم تكون داخل روم صوتي لتسجيل الدخول")
                 return
 
-            # لو كتبها أكثر من مرة ما يخرب
             if member.id in sessions:
                 await message.reply("⚠️ انت مسجل دخول بالفعل")
                 return
@@ -64,10 +63,6 @@ async def on_message(message):
 
             if member.id not in sessions:
                 await message.reply("❌ انت مو مسجل دخول")
-                return
-
-            if member.voice and member.voice.channel:
-                await message.reply("❌ لازم تطلع من الروم الصوتي قبل تسجيل الخروج")
                 return
 
             start = sessions[member.id]
@@ -85,13 +80,13 @@ async def on_message(message):
             save_points()
 
             await message.reply(
-                f"⏱ مدة حضورك: {minutes} دقيقة\n⭐ نقاطك الحالية: {points[str(member.id)]}"
+                f"⏱ مدة حضورك: {minutes} دقيقة\n⭐ نقاطك: {points[str(member.id)]}"
             )
 
         await bot.process_commands(message)
 
     except Exception:
-        print("⚠️ ERROR DETECTED")
+        print("ERROR")
         print(traceback.format_exc())
 
 bot.run(TOKEN)
