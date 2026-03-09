@@ -68,19 +68,22 @@ async def on_message(message):
             start = sessions[member.id]
             duration = int(time.time() - start)
 
-            minutes = duration // 60
+            hours = duration / 3600
+            earned_points = int(hours * 30)
 
             del sessions[member.id]
 
             if str(member.id) not in points:
                 points[str(member.id)] = 0
 
-            points[str(member.id)] += minutes
+            points[str(member.id)] += earned_points
 
             save_points()
 
+            minutes = duration // 60
+
             await message.reply(
-                f"⏱ مدة حضورك: {minutes} دقيقة\n⭐ نقاطك: {points[str(member.id)]}"
+                f"⏱ مدة حضورك: {minutes} دقيقة\n⭐ النقاط المكتسبة: {earned_points}\n🏆 مجموع نقاطك: {points[str(member.id)]}"
             )
 
         await bot.process_commands(message)
