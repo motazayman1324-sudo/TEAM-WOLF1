@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 import os
 import time
+import json
+import traceback
 
 TOKEN = os.getenv("TOKEN")
 LOGIN_CHANNEL = 1473015218211651706
@@ -9,62 +11,87 @@ LOGIN_CHANNEL = 1473015218211651706
 intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
+intents.guilds = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 sessions = {}
 points = {}
 
+# تحميل النقاط
+if os.path.exists("points.json"):
+    with open("points.json", "r") as f:
+        points = json.load(f)
+
+def save_points():
+    with open("points.json", "w") as f:
+        json.dump(points, f)
+
 @bot.event
 async def on_ready():
-    print(f"Bot Ready: {bot.user}")
+    print(f"✅ Bot Online: {bot.user}")
 
 @bot.event
 async def on_message(message):
-    if message.author.bot:
-        return
+    try:
 
-    if message.channel.id != LOGIN_CHANNEL:
-        return
-
-    member = message.guild.get_member(message.author.id)
-
-    if message.content == "تسجيل دخول":
-
-        if member.voice is None or member.voice.channel is None:
-            await message.reply("❌ لازم تكون داخل روم صوتي")
+        if message.author.bot:
             return
 
-        if member.id in sessions:
-            await message.reply("⚠️ انت مسجل دخول بالفعل")
+        if message.channel.id != LOGIN_CHANNEL:
             return
 
-        sessions[member.id] = time.time()
-        await message.reply("✅ تم تسجيل دخولك")
+        member = message.guild.get_member(message.author.id)
 
-    elif message.content == "تسجيل خروج":
+        # تسجيل دخول
+        if message.content == "تسجيل دخول":
 
-        if member.id not in sessions:
-            await message.reply("❌ انت مو مسجل دخول")
-            return
+            if not member.voice or not member.voice.channel:
+                await message.reply("❌ لازم تكون داخل روم صوتي لتسجيل الدخول")
+                return
 
-        if member.voice and member.voice.channel:
-            await message.reply("❌ اطلع من الصوتي قبل تسجيل الخروج")
-            return
+            # لو كتبها أكثر من مرة ما يخرب
+            if member.id in sessions:
+                await message.reply("⚠️ انت مسجل دخول بالفعل")
+                return
 
-        start = sessions[member.id]
-        duration = int(time.time() - start)
-        minutes = duration // 60
+            sessions[member.id] = time.time()
 
-        del sessions[member.id]
+            await message.reply("✅ تم تسجيل دخولك وبدأ حساب الوقت")
 
-        if member.id not in points:
-            points[member.id] = 0
+        # تسجيل خروج
+        elif message.content == "تسجيل خروج":
 
-        points[member.id] += minutes
+            if member.id not in sessions:
+                await message.reply("❌ انت مو مسجل دخول")
+                return
 
-        await message.reply(f"⏱ جلست {minutes} دقيقة\n⭐ نقاطك: {points[member.id]}")
+            if member.voice and member.voice.channel:
+                await message.reply("❌ لازم تطلع من الروم الصوتي قبل تسجيل الخروج")
+                return
 
-    await bot.process_commands(message)
+            start = sessions[member.id]
+            duration = int(time.time() - start)
 
- bot.run(TOKEN)
+            minutes = duration // 60
+
+            del sessions[member.id]
+
+            if str(member.id) not in points:
+                points[str(member.id)] = 0
+
+            points[str(member.id)] += minutes
+
+            save_points()
+
+            await message.reply(
+                f"⏱ مدة حضورك: {minutes} دقيقة\n⭐ نقاطك الحالية: {points[str(member.id)]}"
+            )
+
+        await bot.process_commands(message)
+
+    except Exception:
+        print("⚠️ ERROR DETECTED")
+        print(traceback.format_exc())
+
+bot.run(TOKEN)
