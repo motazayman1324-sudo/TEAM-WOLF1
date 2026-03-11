@@ -29,23 +29,13 @@ def save_points():
     with open("points.json","w") as f:
         json.dump(points,f)
 
+# تنسيق الوقت الجديد
 def format_time(seconds):
     h = seconds // 3600
     m = (seconds % 3600) // 60
     s = seconds % 60
 
-    parts = []
-
-    if h > 0:
-        parts.append(f"⏰ {h} ساعة")
-
-    if m > 0:
-        parts.append(f"🕐 {m} دقيقة")
-
-    if s > 0:
-        parts.append(f"⏱️ {s} ثانية")
-
-    return " و ".join(parts)
+    return f"⏳ {h:02}:{m:02}:{s:02}"
 
 @bot.event
 async def on_ready():
