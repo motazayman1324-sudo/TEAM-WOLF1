@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import os
 import time
 import json
@@ -9,8 +10,16 @@ import traceback
 TOKEN = os.getenv("TOKEN")
 LOGIN_CHANNEL = 1473015218211651706
 
-# الرتب المسموح لها بالتصفير
+# رتب التصفير
 ALLOWED_ROLES = [1473015044643094643, 1473015048443269160]
+
+# رتب عرض النقاط
+ALLOWED_VIEW_ROLES = [
+    1473783225535955207,
+    1480382273760137426,
+    1473015044643094643,
+    1473015048443269160
+]
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -38,13 +47,33 @@ def format_time(seconds):
     s = seconds % 60
     return f"⏳ {h:02}:{m:02}:{s:02}"
 
-# التحقق من الرتب
 def has_permission(member):
     return any(role.id in ALLOWED_ROLES for role in member.roles)
+
+def has_view_permission(member):
+    return any(role.id in ALLOWED_VIEW_ROLES for role in member.roles)
 
 @bot.event
 async def on_ready():
     print(f"🤖 Bot Online: {bot.user}")
+    await bot.tree.sync()
+
+# ======================
+# Slash Command /نقاط
+# ======================
+@bot.tree.command(name="نقاط", description="عرض نقاط عضو")
+@app_commands.describe(member="اختر العضو")
+async def points_command(interaction: discord.Interaction, member: discord.Member):
+
+    if not has_view_permission(interaction.user):
+        await interaction.response.send_message("❌ | ليس لديك صلاحية.", ephemeral=True)
+        return
+
+    user_points = points.get(str(member.id), 0)
+
+    await interaction.response.send_message(
+        f"📊 | نقاط {member.mention}: **{user_points}**"
+    )
 
 @bot.event
 async def on_message(message):
@@ -54,10 +83,9 @@ async def on_message(message):
 
         member = message.guild.get_member(message.author.id)
 
-        # =======================
+        # ======================
         # أوامر التصفير
-        # =======================
-
+        # ======================
         if message.content.startswith("/صفر"):
 
             if not has_permission(member):
@@ -88,28 +116,25 @@ async def on_message(message):
             await message.reply("🧹 | تم تصفير جميع النقاط.")
             return
 
-        # =======================
-        # نظام الحضور (كما هو)
-        # =======================
-
+        # ======================
+        # نظام الحضور
+        # ======================
         if message.channel.id != LOGIN_CHANNEL:
             return
 
-        # تسجيل دخول
         if message.content == "تسجيل دخول":
 
             if not member.voice or not member.voice.channel:
-                await message.reply("❌ | لازم تكون داخل روم صوتي للتسجيل.")
+                await message.reply("❌ | لازم تكون داخل روم صوتي.")
                 return
 
             if member.id in sessions:
-                await message.reply("⚠️ | انت مسجل دخول بالفعل.")
+                await message.reply("⚠️ | انت مسجل بالفعل.")
                 return
 
             sessions[member.id] = time.time()
             await message.reply("🟢 | تم تسجيل دخولك.")
 
-        # تسجيل خروج
         elif message.content == "تسجيل خروج":
 
             if member.id not in sessions:
