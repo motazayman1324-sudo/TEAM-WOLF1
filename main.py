@@ -59,8 +59,9 @@ async def on_ready():
     await bot.tree.sync()
 
 # ======================
-# Slash Command /نقاط
+# Slash Commands
 # ======================
+
 @bot.tree.command(name="نقاط", description="عرض نقاط عضو")
 @app_commands.describe(member="اختر العضو")
 async def points_command(interaction: discord.Interaction, member: discord.Member):
@@ -75,52 +76,45 @@ async def points_command(interaction: discord.Interaction, member: discord.Membe
         f"📊 | نقاط {member.mention}: **{user_points}**"
     )
 
+@bot.tree.command(name="صفر", description="تصفير نقاط عضو")
+@app_commands.describe(member="اختر العضو")
+async def reset_user_points(interaction: discord.Interaction, member: discord.Member):
+
+    if not has_permission(interaction.user):
+        await interaction.response.send_message("❌ | ليس لديك صلاحية.", ephemeral=True)
+        return
+
+    points[str(member.id)] = 0
+    save_points()
+
+    await interaction.response.send_message(f"🧹 | تم تصفير نقاط {member.mention}")
+
+@bot.tree.command(name="تصفير", description="تصفير جميع النقاط")
+async def reset_all_points(interaction: discord.Interaction):
+
+    if not has_permission(interaction.user):
+        await interaction.response.send_message("❌ | ليس لديك صلاحية.", ephemeral=True)
+        return
+
+    points.clear()
+    save_points()
+
+    await interaction.response.send_message("🧹 | تم تصفير جميع النقاط")
+
+# ======================
+# نظام الحضور
+# ======================
+
 @bot.event
 async def on_message(message):
     try:
         if message.author.bot:
             return
 
-        member = message.guild.get_member(message.author.id)
-
-        # ======================
-        # أوامر التصفير
-        # ======================
-        if message.content.startswith("/صفر"):
-
-            if not has_permission(member):
-                await message.reply("❌ | ليس لديك صلاحية.")
-                return
-
-            if not message.mentions:
-                await message.reply("❌ | لازم تمنشن عضو.")
-                return
-
-            target = message.mentions[0]
-
-            points[str(target.id)] = 0
-            save_points()
-
-            await message.reply(f"🧹 | تم تصفير نقاط {target.mention}")
-            return
-
-        if message.content == "/تصفير":
-
-            if not has_permission(member):
-                await message.reply("❌ | ليس لديك صلاحية.")
-                return
-
-            points.clear()
-            save_points()
-
-            await message.reply("🧹 | تم تصفير جميع النقاط.")
-            return
-
-        # ======================
-        # نظام الحضور
-        # ======================
         if message.channel.id != LOGIN_CHANNEL:
             return
+
+        member = message.guild.get_member(message.author.id)
 
         if message.content == "تسجيل دخول":
 
