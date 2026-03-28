@@ -9,6 +9,9 @@ import traceback
 TOKEN = os.getenv("TOKEN")
 LOGIN_CHANNEL = 1473015218211651706
 
+# الرتب المسموح لها بالتصفير
+ALLOWED_ROLES = [1473015044643094643, 1473015048443269160]
+
 intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
@@ -29,13 +32,15 @@ def save_points():
     with open("points.json","w") as f:
         json.dump(points,f)
 
-# تنسيق الوقت الجديد
 def format_time(seconds):
     h = seconds // 3600
     m = (seconds % 3600) // 60
     s = seconds % 60
-
     return f"⏳ {h:02}:{m:02}:{s:02}"
+
+# التحقق من الرتب
+def has_permission(member):
+    return any(role.id in ALLOWED_ROLES for role in member.roles)
 
 @bot.event
 async def on_ready():
@@ -43,16 +48,52 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-
     try:
-
         if message.author.bot:
             return
 
-        if message.channel.id != LOGIN_CHANNEL:
+        member = message.guild.get_member(message.author.id)
+
+        # =======================
+        # أوامر التصفير
+        # =======================
+
+        if message.content.startswith("/صفر"):
+
+            if not has_permission(member):
+                await message.reply("❌ | ليس لديك صلاحية.")
+                return
+
+            if not message.mentions:
+                await message.reply("❌ | لازم تمنشن عضو.")
+                return
+
+            target = message.mentions[0]
+
+            points[str(target.id)] = 0
+            save_points()
+
+            await message.reply(f"🧹 | تم تصفير نقاط {target.mention}")
             return
 
-        member = message.guild.get_member(message.author.id)
+        if message.content == "/تصفير":
+
+            if not has_permission(member):
+                await message.reply("❌ | ليس لديك صلاحية.")
+                return
+
+            points.clear()
+            save_points()
+
+            await message.reply("🧹 | تم تصفير جميع النقاط.")
+            return
+
+        # =======================
+        # نظام الحضور (كما هو)
+        # =======================
+
+        if message.channel.id != LOGIN_CHANNEL:
+            return
 
         # تسجيل دخول
         if message.content == "تسجيل دخول":
@@ -66,14 +107,13 @@ async def on_message(message):
                 return
 
             sessions[member.id] = time.time()
-
-            await message.reply("🟢 | تم تسجيل دخولك وبدأ حساب وقت الحضور.")
+            await message.reply("🟢 | تم تسجيل دخولك.")
 
         # تسجيل خروج
         elif message.content == "تسجيل خروج":
 
             if member.id not in sessions:
-                await message.reply("❌ | انت غير مسجل في دفتر الحضور.")
+                await message.reply("❌ | انت غير مسجل.")
                 return
 
             start = sessions[member.id]
@@ -90,14 +130,10 @@ async def on_message(message):
             points[str(member.id)] += earned_points
             save_points()
 
-            time_text = format_time(duration)
-
             await message.reply(
-                f"📋 **دفتر الحضور**\n"
-                f"━━━━━━━━━━━━━━━\n"
-                f"⏳ مدة حضورك:\n{time_text}\n\n"
-                f"⭐ النقاط المكتسبة: **{earned_points}**\n"
-                f"🏆 مجموع نقاطك: **{points[str(member.id)]}**"
+                f"⏳ الوقت: {format_time(duration)}\n"
+                f"⭐ النقاط: {earned_points}\n"
+                f"🏆 مجموعك: {points[str(member.id)]}"
             )
 
         await bot.process_commands(message)
@@ -105,30 +141,15 @@ async def on_message(message):
     except Exception:
         print(traceback.format_exc())
 
-
 @bot.event
 async def on_voice_state_update(member, before, after):
-
     try:
-
         if member.id not in sessions:
             return
 
-        # خرج من الصوتي
         if before.channel and not after.channel:
 
-            try:
-                await member.send(
-                    "📢 **تنبيه خروج من الروم الصوتي**\n"
-                    "━━━━━━━━━━━━━━━\n"
-                    "🚪 تم رصد خروجك من الروم الصوتي.\n"
-                    "⏳ لديك **5 دقائق** للعودة قبل إلغاء تسجيل الدخول."
-                )
-            except:
-                pass
-
             async def leave_timer():
-
                 await asyncio.sleep(300)
 
                 if member.id in sessions and (not member.voice or not member.voice.channel):
@@ -147,37 +168,14 @@ async def on_voice_state_update(member, before, after):
                     points[str(member.id)] += earned_points
                     save_points()
 
-                    try:
-                        await member.send(
-                            "⏰ **انتهت المهلة**\n"
-                            "━━━━━━━━━━━━━━━\n"
-                            "❌ انتهت مهلة **5 دقائق**.\n"
-                            "📋 تم إلغاء تسجيل دخولك تلقائياً من دفتر الحضور."
-                        )
-                    except:
-                        pass
-
             leave_timers[member.id] = asyncio.create_task(leave_timer())
 
-        # رجع للصوتي
         if after.channel:
-
             if member.id in leave_timers:
                 leave_timers[member.id].cancel()
                 del leave_timers[member.id]
 
-                try:
-                    await member.send(
-                        "✅ **تم رصد عودتك للصوتي**\n"
-                        "━━━━━━━━━━━━━━━\n"
-                        "🎧 مرحباً بعودتك!\n"
-                        "⏳ تم إلغاء المهلة واستمرار تسجيل حضورك."
-                    )
-                except:
-                    pass
-
     except Exception:
         print(traceback.format_exc())
-
 
 bot.run(TOKEN)
