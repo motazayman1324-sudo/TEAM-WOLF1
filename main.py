@@ -10,10 +10,8 @@ import traceback
 TOKEN = os.getenv("TOKEN")
 LOGIN_CHANNEL = 1473015218211651706
 
-# رتب التصفير
-ALLOWED_ROLES = [1473015044643094643, 1473015048443269160]
+ALLOWED_ROLES = [1473015048443269160, 1473015044643094643]
 
-# رتب عرض النقاط
 ALLOWED_VIEW_ROLES = [
     1473783225535955207,
     1480382273760137426,
@@ -33,6 +31,7 @@ sessions = {}
 points = {}
 leave_timers = {}
 
+# تحميل النقاط
 if os.path.exists("points.json"):
     with open("points.json","r") as f:
         points = json.load(f)
@@ -41,6 +40,7 @@ def save_points():
     with open("points.json","w") as f:
         json.dump(points,f)
 
+# تنسيق الوقت
 def format_time(seconds):
     h = seconds // 3600
     m = (seconds % 3600) // 60
@@ -74,6 +74,53 @@ async def points_command(interaction: discord.Interaction, member: discord.Membe
 
     await interaction.response.send_message(
         f"📊 | نقاط {member.mention}: **{user_points}**"
+    )
+
+@bot.tree.command(name="اعطاء_نقاط", description="إعطاء نقاط لعضو")
+@app_commands.describe(member="العضو", amount="عدد النقاط")
+async def give_points(interaction: discord.Interaction, member: discord.Member, amount: int):
+
+    if not has_permission(interaction.user):
+        await interaction.response.send_message("❌ | ليس لديك صلاحية.", ephemeral=True)
+        return
+
+    if amount <= 0:
+        await interaction.response.send_message("❌ | العدد لازم يكون أكبر من 0", ephemeral=True)
+        return
+
+    if str(member.id) not in points:
+        points[str(member.id)] = 0
+
+    points[str(member.id)] += amount
+    save_points()
+
+    await interaction.response.send_message(
+        f"🎁 | تم إعطاء {member.mention} **{amount}** نقطة"
+    )
+
+@bot.tree.command(name="سحب_نقاط", description="سحب نقاط من عضو")
+@app_commands.describe(member="العضو", amount="عدد النقاط")
+async def remove_points(interaction: discord.Interaction, member: discord.Member, amount: int):
+
+    if not has_permission(interaction.user):
+        await interaction.response.send_message("❌ | ليس لديك صلاحية.", ephemeral=True)
+        return
+
+    if amount <= 0:
+        await interaction.response.send_message("❌ | العدد لازم يكون أكبر من 0", ephemeral=True)
+        return
+
+    current = points.get(str(member.id), 0)
+
+    if current < amount:
+        await interaction.response.send_message("❌ | ما عنده نقاط كافية", ephemeral=True)
+        return
+
+    points[str(member.id)] = current - amount
+    save_points()
+
+    await interaction.response.send_message(
+        f"🗑️ | تم سحب **{amount}** نقطة من {member.mention}"
     )
 
 @bot.tree.command(name="صفر", description="تصفير نقاط عضو")
@@ -166,7 +213,13 @@ async def on_voice_state_update(member, before, after):
         if member.id not in sessions:
             return
 
+        # خروج من الصوتي
         if before.channel and not after.channel:
+
+            try:
+                await member.send("📢 تم رصد خروجك من الصوتي، لديك 5 دقائق للعودة.")
+            except:
+                pass
 
             async def leave_timer():
                 await asyncio.sleep(300)
@@ -187,12 +240,23 @@ async def on_voice_state_update(member, before, after):
                     points[str(member.id)] += earned_points
                     save_points()
 
+                    try:
+                        await member.send("⏰ انتهت المهلة، تم تسجيل خروجك تلقائياً.")
+                    except:
+                        pass
+
             leave_timers[member.id] = asyncio.create_task(leave_timer())
 
+        # رجوع للصوتي
         if after.channel:
             if member.id in leave_timers:
                 leave_timers[member.id].cancel()
                 del leave_timers[member.id]
+
+                try:
+                    await member.send("✅ تم رصد عودتك، تم إلغاء المهلة.")
+                except:
+                    pass
 
     except Exception:
         print(traceback.format_exc())
