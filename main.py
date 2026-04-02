@@ -31,7 +31,7 @@ sessions = {}
 points = {}
 leave_timers = {}
 
-# تحميل النقاط
+# تحميل البيانات
 if os.path.exists("points.json"):
     with open("points.json","r") as f:
         points = json.load(f)
@@ -40,12 +40,11 @@ def save_points():
     with open("points.json","w") as f:
         json.dump(points,f)
 
-# تنسيق الوقت
 def format_time(seconds):
     h = seconds // 3600
     m = (seconds % 3600) // 60
     s = seconds % 60
-    return f"⏳ {h:02}:{m:02}:{s:02}"
+    return f"{h:02}:{m:02}:{s:02}"
 
 def has_permission(member):
     return any(role.id in ALLOWED_ROLES for role in member.roles)
@@ -55,28 +54,25 @@ def has_view_permission(member):
 
 @bot.event
 async def on_ready():
-    print(f"🤖 Bot Online: {bot.user}")
+    print(f"Bot Online: {bot.user}")
     await bot.tree.sync()
 
 # ======================
 # Slash Commands
 # ======================
 
-@bot.tree.command(name="نقاط", description="عرض نقاط عضو")
-@app_commands.describe(member="اختر العضو")
+@bot.tree.command(name="نقاط")
+@app_commands.describe(member="العضو")
 async def points_command(interaction: discord.Interaction, member: discord.Member):
-
     if not has_view_permission(interaction.user):
         await interaction.response.send_message("❌ | ليس لديك صلاحية.", ephemeral=True)
         return
 
-    user_points = points.get(str(member.id), 0)
-
     await interaction.response.send_message(
-        f"📊 | نقاط {member.mention}: **{user_points}**"
+        f"📊 | نقاط {member.mention}: {points.get(str(member.id), 0)}"
     )
 
-@bot.tree.command(name="اعطاء_نقاط", description="إعطاء نقاط لعضو")
+@bot.tree.command(name="اعطاء_نقاط")
 @app_commands.describe(member="العضو", amount="عدد النقاط")
 async def give_points(interaction: discord.Interaction, member: discord.Member, amount: int):
 
@@ -85,20 +81,15 @@ async def give_points(interaction: discord.Interaction, member: discord.Member, 
         return
 
     if amount <= 0:
-        await interaction.response.send_message("❌ | العدد لازم يكون أكبر من 0", ephemeral=True)
+        await interaction.response.send_message("❌ | رقم غير صحيح", ephemeral=True)
         return
 
-    if str(member.id) not in points:
-        points[str(member.id)] = 0
-
-    points[str(member.id)] += amount
+    points[str(member.id)] = points.get(str(member.id), 0) + amount
     save_points()
 
-    await interaction.response.send_message(
-        f"🎁 | تم إعطاء {member.mention} **{amount}** نقطة"
-    )
+    await interaction.response.send_message(f"🎁 تم إعطاء {amount} نقطة لـ {member.mention}")
 
-@bot.tree.command(name="سحب_نقاط", description="سحب نقاط من عضو")
+@bot.tree.command(name="سحب_نقاط")
 @app_commands.describe(member="العضو", amount="عدد النقاط")
 async def remove_points(interaction: discord.Interaction, member: discord.Member, amount: int):
 
@@ -106,47 +97,35 @@ async def remove_points(interaction: discord.Interaction, member: discord.Member
         await interaction.response.send_message("❌ | ليس لديك صلاحية.", ephemeral=True)
         return
 
-    if amount <= 0:
-        await interaction.response.send_message("❌ | العدد لازم يكون أكبر من 0", ephemeral=True)
-        return
-
     current = points.get(str(member.id), 0)
 
-    if current < amount:
-        await interaction.response.send_message("❌ | ما عنده نقاط كافية", ephemeral=True)
+    if amount <= 0 or current < amount:
+        await interaction.response.send_message("❌ | رقم غير صحيح", ephemeral=True)
         return
 
     points[str(member.id)] = current - amount
     save_points()
 
-    await interaction.response.send_message(
-        f"🗑️ | تم سحب **{amount}** نقطة من {member.mention}"
-    )
+    await interaction.response.send_message(f"🗑️ تم سحب {amount} نقطة من {member.mention}")
 
-@bot.tree.command(name="صفر", description="تصفير نقاط عضو")
-@app_commands.describe(member="اختر العضو")
-async def reset_user_points(interaction: discord.Interaction, member: discord.Member):
-
+@bot.tree.command(name="صفر")
+@app_commands.describe(member="العضو")
+async def reset_user(interaction: discord.Interaction, member: discord.Member):
     if not has_permission(interaction.user):
-        await interaction.response.send_message("❌ | ليس لديك صلاحية.", ephemeral=True)
-        return
+        return await interaction.response.send_message("❌ | ليس لديك صلاحية", ephemeral=True)
 
     points[str(member.id)] = 0
     save_points()
+    await interaction.response.send_message(f"🧹 تم تصفير {member.mention}")
 
-    await interaction.response.send_message(f"🧹 | تم تصفير نقاط {member.mention}")
-
-@bot.tree.command(name="تصفير", description="تصفير جميع النقاط")
-async def reset_all_points(interaction: discord.Interaction):
-
+@bot.tree.command(name="تصفير")
+async def reset_all(interaction: discord.Interaction):
     if not has_permission(interaction.user):
-        await interaction.response.send_message("❌ | ليس لديك صلاحية.", ephemeral=True)
-        return
+        return await interaction.response.send_message("❌ | ليس لديك صلاحية", ephemeral=True)
 
     points.clear()
     save_points()
-
-    await interaction.response.send_message("🧹 | تم تصفير جميع النقاط")
+    await interaction.response.send_message("🧹 تم تصفير الجميع")
 
 # ======================
 # نظام الحضور
@@ -163,48 +142,53 @@ async def on_message(message):
 
         member = message.guild.get_member(message.author.id)
 
+        # تسجيل دخول
         if message.content == "تسجيل دخول":
 
             if not member.voice or not member.voice.channel:
-                await message.reply("❌ | لازم تكون داخل روم صوتي.")
-                return
+                return await message.reply("❌ لازم تكون داخل روم صوتي")
 
             if member.id in sessions:
-                await message.reply("⚠️ | انت مسجل بالفعل.")
-                return
+                return await message.reply("⚠️ انت مسجل بالفعل")
 
             sessions[member.id] = time.time()
-            await message.reply("🟢 | تم تسجيل دخولك.")
 
+            await message.reply("🟢 تم تسجيل دخولك")
+
+            try:
+                await member.send(
+                    "🟢 **تم تسجيل دخولك بنجاح**\n"
+                    "━━━━━━━━━━━━━━━\n"
+                    "🎧 تم بدء تتبع حضورك في الروم الصوتي\n"
+                    "⭐ ستحصل على **30 نقطة لكل ساعة**\n"
+                    "⏳ تأكد من البقاء في الروم الصوتي"
+                )
+            except:
+                pass
+
+        # تسجيل خروج
         elif message.content == "تسجيل خروج":
 
             if member.id not in sessions:
-                await message.reply("❌ | انت غير مسجل.")
-                return
+                return await message.reply("❌ انت غير مسجل")
 
             start = sessions[member.id]
             duration = int(time.time() - start)
 
-            hours = duration / 3600
-            earned_points = int(hours * 30)
+            earned = int((duration / 3600) * 30)
 
             del sessions[member.id]
 
-            if str(member.id) not in points:
-                points[str(member.id)] = 0
-
-            points[str(member.id)] += earned_points
+            points[str(member.id)] = points.get(str(member.id), 0) + earned
             save_points()
 
             await message.reply(
-                f"⏳ الوقت: {format_time(duration)}\n"
-                f"⭐ النقاط: {earned_points}\n"
-                f"🏆 مجموعك: {points[str(member.id)]}"
+                f"⏳ الوقت: {format_time(duration)}\n⭐ النقاط: {earned}\n🏆 مجموعك: {points[str(member.id)]}"
             )
 
         await bot.process_commands(message)
 
-    except Exception:
+    except:
         print(traceback.format_exc())
 
 @bot.event
@@ -213,11 +197,16 @@ async def on_voice_state_update(member, before, after):
         if member.id not in sessions:
             return
 
-        # خروج من الصوتي
+        # خرج
         if before.channel and not after.channel:
 
             try:
-                await member.send("📢 تم رصد خروجك من الصوتي، لديك 5 دقائق للعودة.")
+                await member.send(
+                    "📢 **تنبيه خروج من الروم الصوتي**\n"
+                    "━━━━━━━━━━━━━━━\n"
+                    "🚪 تم رصد خروجك من الروم الصوتي.\n"
+                    "⏳ لديك **5 دقائق** للعودة قبل إلغاء تسجيل الدخول."
+                )
             except:
                 pass
 
@@ -228,37 +217,44 @@ async def on_voice_state_update(member, before, after):
 
                     start = sessions[member.id]
                     duration = int(time.time() - start)
-
-                    hours = duration / 3600
-                    earned_points = int(hours * 30)
+                    earned = int((duration / 3600) * 30)
 
                     del sessions[member.id]
 
-                    if str(member.id) not in points:
-                        points[str(member.id)] = 0
-
-                    points[str(member.id)] += earned_points
+                    points[str(member.id)] = points.get(str(member.id), 0) + earned
                     save_points()
 
                     try:
-                        await member.send("⏰ انتهت المهلة، تم تسجيل خروجك تلقائياً.")
+                        await member.send(
+                            "⏰ **انتهت المهلة**\n"
+                            "━━━━━━━━━━━━━━━\n"
+                            "❌ انتهت مهلة **5 دقائق**\n\n"
+                            f"⏳ الوقت: {format_time(duration)}\n"
+                            f"⭐ النقاط: {earned}\n"
+                            f"🏆 مجموعك: {points[str(member.id)]}"
+                        )
                     except:
                         pass
 
             leave_timers[member.id] = asyncio.create_task(leave_timer())
 
-        # رجوع للصوتي
+        # رجع
         if after.channel:
             if member.id in leave_timers:
                 leave_timers[member.id].cancel()
                 del leave_timers[member.id]
 
                 try:
-                    await member.send("✅ تم رصد عودتك، تم إلغاء المهلة.")
+                    await member.send(
+                        "✅ **تم رصد عودتك للصوتي**\n"
+                        "━━━━━━━━━━━━━━━\n"
+                        "🎧 مرحباً بعودتك!\n"
+                        "⏳ تم إلغاء المهلة واستمرار تسجيل حضورك."
+                    )
                 except:
                     pass
 
-    except Exception:
+    except:
         print(traceback.format_exc())
 
 bot.run(TOKEN)
